@@ -1,60 +1,78 @@
  
-# Enhanced Vite React TypeScript Template
+## Backend (Node.js + Express + Gemini + MongoDB)
 
-This template includes built-in detection for missing CSS variables between your Tailwind config and CSS files.
+A production-ready backend scaffold is included in `server/`:
 
-## Features
+- Express with Helmet, CORS, logging, and rate limiting
+- Google Gemini via `@google/generative-ai`
+- MongoDB via Mongoose (`Chat` model)
+- Centralized error handling and Zod validation
+- `.env` support via `dotenv`
 
-- **CSS Variable Detection**: Automatically detects if CSS variables referenced in `tailwind.config.cjs` are defined in `src/index.css`
-- **Enhanced Linting**: Includes ESLint, Stylelint, and custom CSS variable validation
-- **Shadcn/ui**: Pre-configured with all Shadcn components
-- **Modern Stack**: Vite + React + TypeScript + Tailwind CSS
+### 1) Prerequisites
 
-## Available Scripts
+- Node.js 18+
+- MongoDB connection string (Atlas or local)
+- Google Gemini API key
 
-```bash
-# Run all linting (includes CSS variable check)
-npm run lint
+### 2) Configure environment
 
-# Check only CSS variables
-npm run check:css-vars
+Create `server/.env` with:
 
-# Individual linting
-npm run lint:js    # ESLint
-npm run lint:css   # Stylelint
+```
+PORT=5000
+NODE_ENV=development
+FRONTEND_ORIGIN=http://localhost:5173
+MONGODB_URI=YOUR_MONGODB_URI
+# MONGODB_DB_NAME=optional_db_name
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+# GEMINI_MODEL=gemini-1.5-flash
 ```
 
-## CSS Variable Detection
+### 3) Install and run backend
 
-The template includes a custom script that:
-
-1. **Parses `tailwind.config.cjs`** to find all `var(--variable)` references
-2. **Parses `src/index.css`** to find all defined CSS variables (`--variable:`)
-3. **Cross-references** them to find missing definitions
-4. **Reports undefined variables** with clear error messages
-
-### Example Output
-
-When CSS variables are missing:
 ```
-❌ Undefined CSS variables found in tailwind.config.cjs:
-   --sidebar-background
-   --sidebar-foreground
-   --sidebar-primary
-
-Add these variables to src/index.css
+cd server
+npm install
+npm run dev
 ```
 
-When all variables are defined:
+Server will run on `http://localhost:5000`.
+
+### 4) API endpoint
+
+- POST `/chat`
+  - Body: `{ "message": "Hello" }`
+  - Response: `{ "reply": "...", "id": "<mongo_id>", "timestamp": "<ISO>" }`
+
+Example:
+
 ```
-✅ All CSS variables in tailwind.config.cjs are defined
+curl -X POST http://localhost:5000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello"}'
 ```
 
-## How It Works
+### 5) Frontend integration
 
-The detection happens during the `npm run lint` command, which will:
-- Exit with error code 1 if undefined variables are found
-- Show exactly which variables need to be added to your CSS file
-- Integrate seamlessly with your development workflow
+In your React app:
 
-This prevents runtime CSS issues where Tailwind classes reference undefined CSS variables.
+```ts
+async function sendMessage(message: string) {
+  const res = await fetch('http://localhost:5000/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error('Request failed');
+  return res.json();
+}
+```
+
+Ensure `FRONTEND_ORIGIN` matches your Vite dev server origin.
+
+### 6) Production notes
+
+- Set `NODE_ENV=production` to hide stack traces.
+- Restrict `FRONTEND_ORIGIN` to your deployed frontend domain.
+- Use a process manager (PM2) and HTTPS-enabled proxy in production.

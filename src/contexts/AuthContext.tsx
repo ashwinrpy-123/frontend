@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { login as apiLogin, register as apiRegister } from '../lib/api'
 
 interface UserProfile {
   id: string
-  name: string
   email: string
   educationLevel: 'school' | 'college' | 'work' | null
 }
@@ -11,7 +11,7 @@ interface AuthContextValue {
   user: UserProfile | null
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (name: string, email: string, password: string, educationLevel: 'school' | 'college' | 'work') => Promise<void>
+  signup: (email: string, password: string) => Promise<void>
   logout: () => void
   updateEducationLevel: (level: 'school' | 'college' | 'work') => void
 }
@@ -22,12 +22,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
 
   useEffect(() => {
+    const token = localStorage.getItem('auth_token')
     const stored = localStorage.getItem('neolearn_user')
-    if (stored) {
+    if (token && stored) {
       try {
         setUser(JSON.parse(stored))
       } catch {
         setUser(null)
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('neolearn_user')
       }
     }
   }, [])
@@ -37,22 +40,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('neolearn_user', JSON.stringify(user))
     } else {
       localStorage.removeItem('neolearn_user')
+      localStorage.removeItem('auth_token')
     }
   }, [user])
 
-  const login = async (email: string, _password: string) => {
-    await new Promise((r) => setTimeout(r, 400))
-    const existing = localStorage.getItem('neolearn_user')
-    if (existing) {
-      setUser(JSON.parse(existing))
-      return
+  const login = async (email: string, password: string) => {
+    try {
+      const { token } = await apiLogin(email, password)
+      localStorage.setItem('auth_token', token)
+      setUser({ id: email, email, educationLevel: null })
+    } catch (error) {
+      throw new Error('Login failed. Please check your credentials.')
     }
-    setUser({ id: crypto.randomUUID(), name: email.split('@')[0], email, educationLevel: null })
   }
 
-  const signup = async (name: string, email: string, _password: string, educationLevel: 'school' | 'college' | 'work') => {
-    await new Promise((r) => setTimeout(r, 400))
-    setUser({ id: crypto.randomUUID(), name, email, educationLevel })
+  const signup = async (email: string, password: string) => {
+    try {
+      const { token } = await apiRegister(email, password)
+      localStorage.setItem('auth_token', token)
+      setUser({ id: email, email, educationLevel: null })
+    } catch (error) {
+      throw new Error('Registration failed. Email may already be in use.')
+    }
   }
 
   const logout = () => {

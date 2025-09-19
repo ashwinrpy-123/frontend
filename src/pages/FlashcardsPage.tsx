@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Flashcard from '../components/Flashcard';
 import { Plus, BookOpen, Save, Shuffle } from 'lucide-react';
+import { useTopic } from '../contexts/TopicContext';
+import { generateFlashcards, getFlashcards, deleteFlashcard } from '../lib/api';
 
 interface FlashcardData {
   id: string;
@@ -12,71 +14,103 @@ interface FlashcardData {
 }
 
 export function FlashcardsPage() {
-  const [topic, setTopic] = useState('');
+  const { topic } = useTopic();
   const [flashcards, setFlashcards] = useState<FlashcardData[]>([]);
   const [savedFlashcards, setSavedFlashcards] = useState<FlashcardData[]>([]);
   const [activeTab, setActiveTab] = useState<'generated' | 'saved'>('generated');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const currentTopic = localStorage.getItem('currentTopic') || 'Machine Learning';
-    setTopic(currentTopic);
-    generateFlashcards(currentTopic);
     loadSavedFlashcards();
-  }, []);
+    if (topic) {
+      generateFlashcardsFromAPI(topic);
+    }
+  }, [topic]);
 
-  const generateFlashcards = (topicName: string) => {
+  const generateFlashcardsFromAPI = async (topicName: string) => {
     setLoading(true);
 
-    setTimeout(() => {
-      const mockFlashcards: FlashcardData[] = [
-        {
-          id: '1',
-          question: `What is ${topicName}?`,
-          answer: `${topicName} is a field of artificial intelligence that enables computers to learn and make decisions from data without being explicitly programmed for every task.`,
-          topic: topicName
-        },
-        {
-          id: '2',
-          question: `Name three types of ${topicName} algorithms.`,
-          answer: 'Supervised Learning (learns from labeled data), Unsupervised Learning (finds patterns in unlabeled data), and Reinforcement Learning (learns through trial and error).',
-          topic: topicName
-        },
-        {
-          id: '3',
-          question: `What is the difference between training and testing data?`,
-          answer: 'Training data is used to teach the algorithm patterns and relationships, while testing data is used to evaluate how well the trained model performs on new, unseen data.',
-          topic: topicName
-        },
-        {
-          id: '4',
-          question: `What is overfitting in ${topicName}?`,
-          answer: 'Overfitting occurs when a model learns the training data too well, including noise and random fluctuations, making it perform poorly on new data.',
-          topic: topicName
-        },
-        {
-          id: '5',
-          question: `What are some real-world applications of ${topicName}?`,
-          answer: 'Image recognition, natural language processing, recommendation systems, autonomous vehicles, fraud detection, and predictive analytics.',
-          topic: topicName
-        },
-        {
-          id: '6',
-          question: `What is a neural network?`,
-          answer: 'A neural network is a computing system inspired by biological neural networks, consisting of interconnected nodes (neurons) that process and transmit information.',
-          topic: topicName
-        }
-      ];
-
-      setFlashcards(mockFlashcards);
+    try {
+      const data = await generateFlashcards(topicName, 10);
+      const formattedCards: FlashcardData[] = data.cards.map((card: any, index: number) => ({
+        id: String(index + 1),
+        question: card.front,
+        answer: card.back,
+        topic: topicName
+      }));
+      setFlashcards(formattedCards);
+    } catch (err) {
+      console.error('Failed to generate flashcards:', err);
+      // Fallback to mock flashcards
+      generateMockFlashcards(topicName);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const loadSavedFlashcards = () => {
-    const saved = localStorage.getItem('savedFlashcards');
-    if (saved) {
-      setSavedFlashcards(JSON.parse(saved));
+  const generateMockFlashcards = (topicName: string) => {
+    const mockFlashcards: FlashcardData[] = [
+      {
+        id: '1',
+        question: `What is ${topicName}?`,
+        answer: `${topicName} is a field of artificial intelligence that enables computers to learn and make decisions from data without being explicitly programmed for every task.`,
+        topic: topicName
+      },
+      {
+        id: '2',
+        question: `Name three types of ${topicName} algorithms.`,
+        answer: 'Supervised Learning (learns from labeled data), Unsupervised Learning (finds patterns in unlabeled data), and Reinforcement Learning (learns through trial and error).',
+        topic: topicName
+      },
+      {
+        id: '3',
+        question: `What is the difference between training and testing data?`,
+        answer: 'Training data is used to teach the algorithm patterns and relationships, while testing data is used to evaluate how well the trained model performs on new, unseen data.',
+        topic: topicName
+      },
+      {
+        id: '4',
+        question: `What is overfitting in ${topicName}?`,
+        answer: 'Overfitting occurs when a model learns the training data too well, including noise and random fluctuations, making it perform poorly on new data.',
+        topic: topicName
+      },
+      {
+        id: '5',
+        question: `What are some real-world applications of ${topicName}?`,
+        answer: 'Image recognition, natural language processing, recommendation systems, autonomous vehicles, fraud detection, and predictive analytics.',
+        topic: topicName
+      },
+      {
+        id: '6',
+        question: `What is a neural network?`,
+        answer: 'A neural network is a computing system inspired by biological neural networks, consisting of interconnected nodes (neurons) that process and transmit information.',
+        topic: topicName
+      }
+    ];
+
+    setFlashcards(mockFlashcards);
+  };
+
+  const loadSavedFlashcards = async () => {
+    try {
+      const data = await getFlashcards();
+      const formattedCards: FlashcardData[] = data.flatMap((set: any) => 
+        set.cards.map((card: any, index: number) => ({
+          id: `${set._id}-${index}`,
+          question: card.front,
+          answer: card.back,
+          topic: set.topic,
+          saved: true
+        }))
+      );
+      setSavedFlashcards(formattedCards);
+    } catch (err) {
+      console.error('Failed to load flashcards:', err);
+      // Fallback to localStorage
+      const saved = localStorage.getItem('savedFlashcards');
+      if (saved) {
+        setSavedFlashcards(JSON.parse(saved));
+      }
     }
   };
 
@@ -102,12 +136,20 @@ export function FlashcardsPage() {
     }
   };
 
-  const deleteFlashcard = (id: string) => {
-    const newSavedFlashcards = savedFlashcards.filter(f => f.id !== id);
-    setSavedFlashcards(newSavedFlashcards);
-    localStorage.setItem('savedFlashcards', JSON.stringify(newSavedFlashcards));
-    
-    setFlashcards(prev => prev.map(f => f.id === id ? { ...f, saved: false } : f));
+  const handleDeleteFlashcard = async (id: string) => {
+    try {
+      // Extract set ID from the card ID (format: setId-cardIndex)
+      const setId = id.split('-')[0];
+      await deleteFlashcard(setId);
+      loadSavedFlashcards(); // Refresh the list
+    } catch (err) {
+      console.error('Failed to delete flashcard:', err);
+      // Fallback to local removal
+      const newSavedFlashcards = savedFlashcards.filter(f => f.id !== id);
+      setSavedFlashcards(newSavedFlashcards);
+      localStorage.setItem('savedFlashcards', JSON.stringify(newSavedFlashcards));
+      setFlashcards(prev => prev.map(f => f.id === id ? { ...f, saved: false } : f));
+    }
   };
 
   const toggleLike = (id: string) => {
@@ -134,11 +176,18 @@ export function FlashcardsPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Flashcards: {topic}
+            Flashcards: {topic || 'Select a Topic'}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Study with interactive flashcards to improve retention
           </p>
+          {topic && (
+            <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg max-w-md mx-auto">
+              <p className="text-sm text-primary font-medium">
+                📚 Learning about: <span className="font-bold">{topic}</span>
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden mb-8">
@@ -177,7 +226,7 @@ export function FlashcardsPage() {
               <div className="flex space-x-3">
                 {activeTab === 'generated' && (
                   <button
-                    onClick={() => generateFlashcards(topic)}
+                    onClick={() => generateFlashcardsFromAPI(topic)}
                     className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                     disabled={loading}
                   >
@@ -221,7 +270,7 @@ export function FlashcardsPage() {
                     key={flashcard.id}
                     card={flashcard}
                     onSave={saveFlashcard}
-                    onDelete={deleteFlashcard}
+                    onDelete={handleDeleteFlashcard}
                     onLike={activeTab==='saved'? toggleLike : undefined}
                     showActions={true}
                   />

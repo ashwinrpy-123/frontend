@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import { TopicProvider } from './contexts/TopicContext';
 import { Home } from './pages/Home';
 import { QuizPage } from './pages/QuizPage';
 import { FlashcardsPage } from './pages/FlashcardsPage';
@@ -10,7 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
-import { Chatbot } from './pages/Chatbot';
+import { ChatbotNew as Chatbot } from './pages/ChatbotNew';
 import { useAuth } from './contexts/AuthContext';
 
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
@@ -22,10 +23,11 @@ function App() {
   const { isAuthenticated } = useAuth()
   return (
     <Router>
-      <div className="min-h-screen bg-background dark:bg-dark transition-colors">
-        <Navbar />
-        <main className="pt-16">
-          <Routes>
+      <TopicProvider>
+        <div className="min-h-screen bg-background dark:bg-dark transition-colors">
+          <Navbar />
+          <main className="pt-16">
+            <Routes>
             <Route path="/" element={isAuthenticated ? <Home /> : <Landing />} />
             <Route path="/dashboard" element={<ProtectedRoute element={<Home />} />} />
             <Route path="/login" element={<Login />} />
@@ -35,9 +37,10 @@ function App() {
             <Route path="/flashcards" element={<ProtectedRoute element={<FlashcardsPage />} />} />
             <Route path="/progress" element={<ProtectedRoute element={<ProgressPage />} />} />
             <Route path="/profile" element={<ProtectedRoute element={<ProfilePage />} />} />
-          </Routes>
-        </main>
-      </div>
+            </Routes>
+          </main>
+        </div>
+      </TopicProvider>
     </Router>
   );
 }

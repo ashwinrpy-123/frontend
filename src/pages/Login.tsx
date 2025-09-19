@@ -17,8 +17,8 @@ export function Login() {
     try {
       await login(email, password)
       navigate('/dashboard')
-    } catch (err) {
-      setError('Login failed. Please try again.')
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
     }

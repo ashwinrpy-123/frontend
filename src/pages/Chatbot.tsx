@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Send, Sparkles, BookOpen, Brain, Upload, FileText, Image, X } from 'lucide-react'
+import { sendChatMessage } from '../lib/api'
+import { useTopic } from '../contexts/TopicContext'
 
 interface Message {
   id: string
@@ -18,6 +20,7 @@ interface UploadedFile {
 }
 
 export function Chatbot() {
+  const { topic, setTopic } = useTopic()
   const [messages, setMessages] = useState<Message[]>([
     { id: 'welcome', role: 'assistant', text: 'Hi, I am StudyBuddy. Ask me to summarize a topic, generate flashcards, or create a quiz. You can also upload images or PDFs for me to analyze!' }
   ])
@@ -28,6 +31,24 @@ export function Chatbot() {
   const endRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) })
+
+  // Auto-send topic when page loads
+  useEffect(() => {
+    if (topic && messages.length === 1) {
+      // Only send if we have the welcome message and a topic
+      handleSend(topic)
+    }
+  }, [topic])
+
+  const formatText = (text: string) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic text
+      .replace(/\n\n/g, '</p><p>') // Paragraph breaks
+      .replace(/\n/g, '<br>') // Line breaks
+      .replace(/^/, '<p>') // Start with paragraph
+      .replace(/$/, '</p>') // End with paragraph
+  }
 
   const addAssistant = (text: string) => setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text }])
   const addUser = (text: string, files?: UploadedFile[]) => setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text, files }])
@@ -89,21 +110,21 @@ export function Chatbot() {
     addUser(content || 'Uploaded files', filesToSend)
     setInput('')
     setUploadedFiles([])
-    
-    setTimeout(async () => {
+    if (content) setTopic(content)
+    try {
       if (filesToSend.length > 0) {
         const response = await simulateFileProcessing(filesToSend)
         addAssistant(response)
-      } else if (/flashcard/i.test(content)) {
-        addAssistant('Here are 3 example flashcards. You can save from the Flashcards page.')
-      } else if (/quiz/i.test(content)) {
-        addAssistant('I prepared a 10-question quiz. Go to the Quiz page to take it!')
-      } else if (/summar/i.test(content)) {
-        addAssistant('Summary generated. You can review key points and then take a quiz or create cards.')
-      } else {
-        addAssistant('I can summarize topics, generate flashcards, and create quizzes. Try the quick actions below!')
+        return
       }
-    }, 500)
+
+      const data = await sendChatMessage(content)
+      addAssistant(data.reply)
+    } catch (err: any) {
+      const message = err?.message || 'Could not reach the AI service.'
+      addAssistant(`Error: ${message}`)
+      console.error('Chat send error:', err)
+    }
   }
 
   const quick = [
@@ -112,16 +133,39 @@ export function Chatbot() {
     { label: 'Quiz', icon: Brain, text: 'Create a 10-question quiz on: ' },
   ]
 
+  const handleQuickAction = (action: string, text: string) => {
+    if (action === 'Quiz') {
+      // Navigate to quiz page with the topic
+      window.location.href = '/quiz';
+    } else if (action === 'Flashcards') {
+      // Navigate to flashcards page with the topic
+      window.location.href = '/flashcards';
+    } else {
+      // Handle other actions normally
+      handleSend(text);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-6">StudyBuddy</h1>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="relative">
+          <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">StudyBuddy</h1>
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+        </div>
         <div className="bg-card border border-border rounded-2xl shadow-lg overflow-hidden">
-          <div className="h-[60vh] overflow-y-auto p-6 space-y-4">
+          <div className="h-[70vh] overflow-y-auto p-8 space-y-6">
             {messages.map(m => (
               <div key={m.id} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}>
-                <div className={`max-w-[80%] px-4 py-3 rounded-xl ${m.role==='user'?'bg-primary text-primary-foreground':'bg-secondary text-secondary-foreground'}`}>
-                  {m.text}
+                <div className={`max-w-[85%] px-6 py-4 rounded-2xl ${m.role==='user'?'bg-primary text-primary-foreground':'bg-secondary text-secondary-foreground'}`}>
+                  {m.role === 'assistant' ? (
+                    <div 
+                      className="prose prose-sm max-w-none dark:prose-invert"
+                      dangerouslySetInnerHTML={{ __html: formatText(m.text) }}
+                    />
+                  ) : (
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+                  )}
                   {m.files && m.files.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {m.files.map(file => (
@@ -141,7 +185,7 @@ export function Chatbot() {
             ))}
             <div ref={endRef} />
           </div>
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border p-6">
             {uploadedFiles.length > 0 && (
               <div className="mb-3 p-2 bg-secondary/20 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-2">Files to upload:</p>
@@ -168,15 +212,15 @@ export function Chatbot() {
               </div>
             )}
             
-            <div className="flex gap-2 mb-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {quick.map(q => (
-                <button key={q.label} onClick={() => handleSend(q.text)} className="text-xs px-3 py-1 rounded-full bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors flex items-center gap-1">
-                  <q.icon size={14} /> {q.label}
+                <button key={q.label} onClick={() => handleQuickAction(q.label, q.text)} className="text-sm px-4 py-2 rounded-full bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors flex items-center gap-2">
+                  <q.icon size={16} /> {q.label}
                 </button>
               ))}
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -188,9 +232,9 @@ export function Chatbot() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="px-3 py-2 rounded-md border border-border hover:bg-accent/10 transition-colors flex items-center gap-2"
+                className="px-4 py-3 rounded-lg border border-border hover:bg-accent/10 transition-colors flex items-center gap-2"
               >
-                <Upload size={16} />
+                <Upload size={18} />
                 {isUploading ? 'Uploading...' : 'Upload'}
               </button>
               
@@ -198,15 +242,15 @@ export function Chatbot() {
                 value={input} 
                 onChange={(e)=>setInput(e.target.value)} 
                 placeholder="Type your message..." 
-                className="flex-1 px-3 py-2 rounded-md border border-border bg-background" 
+                className="flex-1 px-4 py-3 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-base" 
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               />
               <button 
                 onClick={()=>handleSend()} 
                 disabled={!input.trim() && uploadedFiles.length === 0}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg group"
               >
-                <Send size={16} /> Send
+                <Send size={18} className="group-hover:animate-bounce" /> Send
               </button>
             </div>
           </div>
