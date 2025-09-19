@@ -12,13 +12,7 @@ import chatRouter from './routes/chat.js';
 import authRouter from './routes/auth.js';
 import quizRouter from './routes/quiz.js';
 import flashcardsRouter from './routes/flashcards.js';
-import conversationsRouter from './routes/conversations.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -50,15 +44,11 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Routes
 app.use('/chat', chatRouter);
 app.use('/auth', authRouter);
 app.use('/quiz', quizRouter);
 app.use('/flashcards', flashcardsRouter);
-app.use('/conversations', conversationsRouter);
 
 // 404 handler
 app.use(notFoundHandler);

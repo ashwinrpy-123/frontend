@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Conversation } from '../models/Chat.js';
+import { Chat } from '../models/Chat.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const router = Router();
@@ -54,28 +54,15 @@ router.post('/', async (req, res, next) => {
       return res.status(502).json({ error: 'empty_response_from_model' });
     }
 
-    // For backward compatibility, create a simple conversation entry
-    const conversation = await Conversation.create({
-      user: null, // This endpoint doesn't require authentication
-      title: 'Legacy Chat',
-      messages: [
-        {
-          role: 'user',
-          content: message,
-          timestamp: new Date()
-        },
-        {
-          role: 'assistant',
-          content: botText,
-          timestamp: new Date()
-        }
-      ]
+    const chat = await Chat.create({
+      userMessage: message,
+      botResponse: botText,
     });
 
     return res.status(200).json({
       reply: botText,
-      id: conversation._id,
-      timestamp: conversation.createdAt,
+      id: chat._id,
+      timestamp: chat.timestamp,
     });
   } catch (err) {
     next(err);

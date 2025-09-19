@@ -1,14 +1,5 @@
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
-
 export async function sendChatMessage(message: string): Promise<{ reply: string; id: string; timestamp: string }> {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
@@ -121,98 +112,6 @@ export async function deleteFlashcard(id: string): Promise<void> {
     headers: { 'Authorization': token ? `Bearer ${token}` : '' },
   });
   if (!response.ok) throw new Error('Failed to delete flashcard');
-}
-
-// Conversation endpoints
-export interface Conversation {
-  _id: string;
-  title: string;
-  messages: Message[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  files?: UploadedFile[];
-  timestamp: string;
-}
-
-export interface UploadedFile {
-  name: string;
-  type: string;
-  size: number;
-  url: string;
-  preview?: string;
-}
-
-export async function getConversations(): Promise<Conversation[]> {
-  const response = await fetch(`${API_BASE_URL}/conversations`, {
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) throw new Error('Failed to fetch conversations');
-  return response.json();
-}
-
-export async function getConversation(id: string): Promise<Conversation> {
-  const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) throw new Error('Failed to fetch conversation');
-  return response.json();
-}
-
-export async function createConversation(title: string, firstMessage?: Message): Promise<Conversation> {
-  const response = await fetch(`${API_BASE_URL}/conversations`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ title, firstMessage }),
-  });
-  if (!response.ok) throw new Error('Failed to create conversation');
-  return response.json();
-}
-
-export async function addMessageToConversation(conversationId: string, message: Message): Promise<Conversation> {
-  const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(message),
-  });
-  if (!response.ok) throw new Error('Failed to add message');
-  return response.json();
-}
-
-export async function deleteConversation(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) throw new Error('Failed to delete conversation');
-}
-
-export async function updateConversationTitle(id: string, title: string): Promise<Conversation> {
-  const response = await fetch(`${API_BASE_URL}/conversations/${id}/title`, {
-    method: 'PATCH',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ title }),
-  });
-  if (!response.ok) throw new Error('Failed to update conversation title');
-  return response.json();
-}
-
-export async function uploadFile(file: File): Promise<UploadedFile> {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const token = localStorage.getItem('auth_token');
-  const response = await fetch(`${API_BASE_URL}/conversations/upload`, {
-    method: 'POST',
-    headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-    body: formData,
-  });
-  if (!response.ok) throw new Error('Failed to upload file');
-  return response.json();
 }
 
 

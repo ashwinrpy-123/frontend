@@ -11,7 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
-import { ChatbotNew as Chatbot } from './pages/ChatbotNew';
+import { Chatbot } from './pages/Chatbot';
 import { useAuth } from './contexts/AuthContext';
 
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
